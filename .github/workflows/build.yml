@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -o soquery-${{ matrix.goos }}-${{ matrix.goarch }} .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soquery-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: soquery-${{ matrix.goos }}-${{ matrix.goarch }}
