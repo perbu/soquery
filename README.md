@@ -27,31 +27,15 @@ go build -o soquery .
 
 ## Auth
 
-Two options. Both require `SF_INSTANCE_URL` (e.g. `https://mycompany.my.salesforce.com`).
-
-### Option 1: Access token
+Set credentials via environment variables or a `.env` file in the working directory.
 
 ```
-export SF_INSTANCE_URL="https://mycompany.my.salesforce.com"
-export SF_ACCESS_TOKEN="00D..."
+SALESFORCE_DOMAIN=mycompany.my.salesforce.com
+SALESFORCE_CONSUMER_KEY=3MVG9...
+SALESFORCE_CONSUMER_SECRET=...
 ```
 
-Quick way to get a token using the Salesforce CLI:
-
-```
-sf org login web
-eval $(sf org display --json | jq -r '"export SF_ACCESS_TOKEN=\(.result.accessToken)\nexport SF_INSTANCE_URL=\(.result.instanceUrl)"')
-```
-
-### Option 2: Client credentials (recommended for automation)
-
-```
-export SF_INSTANCE_URL="https://mycompany.my.salesforce.com"
-export SF_CLIENT_ID="3MVG9..."
-export SF_CLIENT_SECRET="..."
-```
-
-The tool fetches a token automatically on each invocation. See below for setup.
+The tool fetches a token automatically on each invocation using the OAuth2 client credentials flow. See below for setup.
 
 ## Salesforce Connected App Setup
 
@@ -91,14 +75,14 @@ This creates a service account with restricted, read-only API access.
   - Under "Client Credentials Flow", set **Run As** to the service user you created
 - Save
 - Go back to **App Manager**, click the dropdown arrow > **View**
-  - Copy **Consumer Key** (this is `SF_CLIENT_ID`)
-  - Click "Manage Consumer Details", verify identity, copy **Consumer Secret** (this is `SF_CLIENT_SECRET`)
+  - Copy **Consumer Key** (this is `SALESFORCE_CONSUMER_KEY`)
+  - Click "Manage Consumer Details", verify identity, copy **Consumer Secret** (this is `SALESFORCE_CONSUMER_SECRET`)
 
 ### 5. Test
 
 ```
-export SF_INSTANCE_URL="https://mycompany.my.salesforce.com"
-export SF_CLIENT_ID="<Consumer Key>"
-export SF_CLIENT_SECRET="<Consumer Secret>"
+export SALESFORCE_DOMAIN="mycompany.my.salesforce.com"
+export SALESFORCE_CONSUMER_KEY="<Consumer Key>"
+export SALESFORCE_CONSUMER_SECRET="<Consumer Secret>"
 soquery "SELECT Id, Name FROM Account LIMIT 5"
 ```
