@@ -54,6 +54,54 @@ func (c *Client) Query(soql string) ([]map[string]interface{}, error) {
 	return allRecords, nil
 }
 
+// Describe returns the fields of an SObject as a slice of maps suitable for FormatMarkdown.
+func (c *Client) Describe(sobject string) ([]map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/services/data/%s/sobjects/%s/describe",
+		c.instanceURL, apiVersion, url.PathEscape(sobject))
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("salesforce API error (HTTP %d): %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Fields []map[string]interface{} `json:"fields"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parsing response: %w", err)
+	}
+
+	// Return a simplified view of each field.
+	var rows []map[string]interface{}
+	for _, f := range result.Fields {
+		rows = append(rows, map[string]interface{}{
+			"Name":     f["name"],
+			"Type":     f["type"],
+			"Label":    f["label"],
+			"Nillable": f["nillable"],
+		})
+	}
+
+	return rows, nil
+}
+
 func (c *Client) fetchPage(endpoint string) (*QueryResult, error) {
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
