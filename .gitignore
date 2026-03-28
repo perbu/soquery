@@ -1,2 +1,4 @@
 .env
-soquery
+/soquery
+/soquery-server
+*.db
