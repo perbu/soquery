@@ -107,6 +107,14 @@ This app needs the **Authorization Code** OAuth flow (not client credentials) be
 
 ### Docker
 
+A pre-built image is available at `ghcr.io/perbu/soquery:latest`.
+
+```bash
+docker run -p 8080:8080 --env-file .env ghcr.io/perbu/soquery:latest
+```
+
+To build locally instead:
+
 ```bash
 docker build -t soquery .
 docker run -p 8080:8080 --env-file .env soquery
