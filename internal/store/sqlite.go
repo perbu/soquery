@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // SQLite driver
@@ -344,15 +343,3 @@ func (s *SQLiteStore) ClaimMCPRefreshToken(ctx context.Context, tokenHash string
 	return &t, nil
 }
 
-// OpenStore opens a store based on the DSN. Supports "sqlite:" prefix for SQLite
-// and "postgres://" prefix for PostgreSQL.
-func OpenStore(dsn string) (Store, error) {
-	switch {
-	case strings.HasPrefix(dsn, "sqlite:"):
-		return NewSQLite(strings.TrimPrefix(dsn, "sqlite:"))
-	case strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://"):
-		return nil, fmt.Errorf("PostgreSQL support not yet implemented")
-	default:
-		return nil, fmt.Errorf("unsupported database DSN: %s", dsn)
-	}
-}

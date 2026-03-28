@@ -20,9 +20,9 @@ internal/
   sfclient/             Salesforce REST API client. Query, Describe, CRUD.
                         All methods take context.Context. 30s HTTP timeout.
                         Max 10,000 records per query (MaxQueryRecords).
-  store/                Persistence interface + SQLite implementation.
+  store/                Persistence interface + SQLite and PostgreSQL implementations.
                         AES-256-GCM encryption for SF tokens at rest.
-                        PostgreSQL implementation not yet built.
+                        `DATABASE_URL=sqlite:path.db` or `DATABASE_URL=postgres://...`
   oauth/                OAuth 2.1 Authorization Server.
                         DCR, authorize (chains to SF login), SF callback,
                         token endpoint with PKCE, JWT issuance.

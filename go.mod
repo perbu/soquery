@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/joho/godotenv v1.5.1
+	github.com/lib/pq v1.12.0
 	github.com/mark3labs/mcp-go v0.46.0
 	golang.org/x/crypto v0.49.0
 	modernc.org/sqlite v1.47.0

@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -90,4 +92,17 @@ type Store interface {
 
 	// Lifecycle
 	Close() error
+}
+
+// OpenStore opens a store based on the DSN. Supports "sqlite:" prefix for SQLite
+// and "postgres://" or "postgresql://" prefix for PostgreSQL.
+func OpenStore(dsn string) (Store, error) {
+	switch {
+	case strings.HasPrefix(dsn, "sqlite:"):
+		return NewSQLite(strings.TrimPrefix(dsn, "sqlite:"))
+	case strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://"):
+		return NewPostgres(dsn)
+	default:
+		return nil, fmt.Errorf("unsupported database DSN: %s", dsn)
+	}
 }
