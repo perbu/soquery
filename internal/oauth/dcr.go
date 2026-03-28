@@ -32,6 +32,12 @@ func (s *Server) HandleDCR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.DCRRateLimit != nil && !s.DCRRateLimit.Allow(clientIP(r)) {
+		w.Header().Set("Retry-After", "60")
+		writeJSONError(w, "too_many_requests", "rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+
 	var req DCRRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, "invalid_request", "invalid JSON body", http.StatusBadRequest)

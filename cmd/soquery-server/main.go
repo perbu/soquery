@@ -40,6 +40,7 @@ func main() {
 	defer db.Close()
 
 	// Create OAuth server.
+	dcrLimiter := oauthpkg.NewIPRateLimiter(10, 1*time.Minute)
 	oauthServer := &oauthpkg.Server{
 		ExternalURL:    cfg.ExternalURL,
 		SFInstanceURL:  cfg.SFInstanceURL(),
@@ -49,7 +50,17 @@ func main() {
 		EncryptionKey:  cfg.TokenEncryptionKey,
 		JWTSigningKey:  cfg.JWTSigningKey,
 		AuditLog:       auditLog,
+		DCRRateLimit:   dcrLimiter,
 	}
+
+	// Periodically clean up stale rate-limiter entries.
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			dcrLimiter.Cleanup()
+		}
+	}()
 
 	// Create MCP server.
 	mcpServer := server.NewMCPServer(

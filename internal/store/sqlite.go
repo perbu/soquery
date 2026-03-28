@@ -202,9 +202,45 @@ func (s *SQLiteStore) GetAuthCode(ctx context.Context, code string) (*AuthCode, 
 	return &ac, nil
 }
 
-func (s *SQLiteStore) MarkAuthCodeUsed(ctx context.Context, code string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE auth_codes SET used = 1 WHERE code = ?`, code)
-	return err
+func (s *SQLiteStore) ClaimAuthCode(ctx context.Context, code string) (*AuthCode, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`UPDATE auth_codes SET used = 1 WHERE code = ? AND used = 0 AND expires_at > ?`,
+		code, time.Now().Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("claiming auth code: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("checking rows affected: %w", err)
+	}
+	if n == 0 {
+		return nil, nil // already used, expired, or not found
+	}
+
+	row := tx.QueryRowContext(ctx,
+		`SELECT code, user_id, mcp_client_id, redirect_uri, code_challenge, code_method, created_at, expires_at
+		 FROM auth_codes WHERE code = ?`, code)
+
+	var ac AuthCode
+	var createdAt, expiresAt string
+	if err := row.Scan(&ac.Code, &ac.UserID, &ac.MCPClientID, &ac.RedirectURI,
+		&ac.CodeChallenge, &ac.CodeMethod, &createdAt, &expiresAt); err != nil {
+		return nil, fmt.Errorf("reading claimed code: %w", err)
+	}
+	ac.CreatedAt = mustParseTime(createdAt)
+	ac.ExpiresAt = mustParseTime(expiresAt)
+	ac.Used = true
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing transaction: %w", err)
+	}
+	return &ac, nil
 }
 
 // --- User Tokens ---
@@ -268,9 +304,44 @@ func (s *SQLiteStore) GetMCPRefreshToken(ctx context.Context, tokenHash string) 
 	return &t, nil
 }
 
-func (s *SQLiteStore) RevokeMCPRefreshToken(ctx context.Context, tokenHash string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE mcp_refresh_tokens SET revoked = 1 WHERE token_hash = ?`, tokenHash)
-	return err
+func (s *SQLiteStore) ClaimMCPRefreshToken(ctx context.Context, tokenHash string) (*MCPRefreshToken, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`UPDATE mcp_refresh_tokens SET revoked = 1 WHERE token_hash = ? AND revoked = 0 AND expires_at > ?`,
+		tokenHash, time.Now().Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("revoking refresh token: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("checking rows affected: %w", err)
+	}
+	if n == 0 {
+		return nil, nil // already revoked, expired, or not found
+	}
+
+	row := tx.QueryRowContext(ctx,
+		`SELECT token_hash, user_id, mcp_client_id, created_at, expires_at
+		 FROM mcp_refresh_tokens WHERE token_hash = ?`, tokenHash)
+
+	var t MCPRefreshToken
+	var createdAt, expiresAt string
+	if err := row.Scan(&t.TokenHash, &t.UserID, &t.MCPClientID, &createdAt, &expiresAt); err != nil {
+		return nil, fmt.Errorf("reading claimed token: %w", err)
+	}
+	t.CreatedAt = mustParseTime(createdAt)
+	t.ExpiresAt = mustParseTime(expiresAt)
+	t.Revoked = true
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing transaction: %w", err)
+	}
+	return &t, nil
 }
 
 // OpenStore opens a store based on the DSN. Supports "sqlite:" prefix for SQLite

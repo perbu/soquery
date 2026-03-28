@@ -73,7 +73,9 @@ type Store interface {
 	// Auth codes (short-lived, after SF auth completes)
 	SaveAuthCode(ctx context.Context, code *AuthCode) error
 	GetAuthCode(ctx context.Context, code string) (*AuthCode, error)
-	MarkAuthCodeUsed(ctx context.Context, code string) error
+	// ClaimAuthCode atomically marks an unused, unexpired auth code as used.
+	// Returns the code if successfully claimed, nil if already used/expired/missing.
+	ClaimAuthCode(ctx context.Context, code string) (*AuthCode, error)
 
 	// Per-user Salesforce tokens
 	SaveUserTokens(ctx context.Context, tokens *UserTokens) error
@@ -82,7 +84,9 @@ type Store interface {
 	// MCP refresh tokens
 	SaveMCPRefreshToken(ctx context.Context, token *MCPRefreshToken) error
 	GetMCPRefreshToken(ctx context.Context, tokenHash string) (*MCPRefreshToken, error)
-	RevokeMCPRefreshToken(ctx context.Context, tokenHash string) error
+	// ClaimMCPRefreshToken atomically revokes an unrevoked, unexpired refresh token.
+	// Returns the token if successfully claimed, nil if already revoked/expired/missing.
+	ClaimMCPRefreshToken(ctx context.Context, tokenHash string) (*MCPRefreshToken, error)
 
 	// Lifecycle
 	Close() error

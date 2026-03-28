@@ -135,16 +135,24 @@ func TestAuthCode_RoundTrip(t *testing.T) {
 		t.Error("code should not be used initially")
 	}
 
-	if err := s.MarkAuthCodeUsed(ctx, "code-456"); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err = s.GetAuthCode(ctx, "code-456")
+	claimed, err := s.ClaimAuthCode(ctx, "code-456")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Used {
-		t.Error("code should be marked as used")
+	if claimed == nil {
+		t.Fatal("expected to claim code, got nil")
+	}
+	if !claimed.Used {
+		t.Error("claimed code should be marked as used")
+	}
+
+	// Second claim should fail (already used).
+	claimed2, err := s.ClaimAuthCode(ctx, "code-456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claimed2 != nil {
+		t.Error("expected nil on second claim (already used)")
 	}
 }
 
@@ -241,15 +249,23 @@ func TestMCPRefreshToken_RoundTrip(t *testing.T) {
 		t.Error("token should not be revoked initially")
 	}
 
-	if err := s.RevokeMCPRefreshToken(ctx, "sha256hash"); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err = s.GetMCPRefreshToken(ctx, "sha256hash")
+	claimed, err := s.ClaimMCPRefreshToken(ctx, "sha256hash")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Revoked {
-		t.Error("token should be revoked")
+	if claimed == nil {
+		t.Fatal("expected to claim token, got nil")
+	}
+	if !claimed.Revoked {
+		t.Error("claimed token should be revoked")
+	}
+
+	// Second claim should fail (already revoked).
+	claimed2, err := s.ClaimMCPRefreshToken(ctx, "sha256hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claimed2 != nil {
+		t.Error("expected nil on second claim (already revoked)")
 	}
 }

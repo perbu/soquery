@@ -24,6 +24,7 @@ type Server struct {
 	EncryptionKey []byte // 32-byte AES key for token encryption
 	JWTSigningKey []byte // 32-byte HMAC key for JWT signing
 	AuditLog      *audit.Logger
+	DCRRateLimit  *IPRateLimiter // Rate limiter for client registration
 }
 
 const (
@@ -184,13 +185,13 @@ func (s *Server) handleAuthCodeExchange(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Look up and validate the authorization code.
-	authCode, err := s.Store.GetAuthCode(r.Context(), code)
+	// Atomically claim the authorization code (marks it used if valid).
+	authCode, err := s.Store.ClaimAuthCode(r.Context(), code)
 	if err != nil {
-		writeJSONError(w, "server_error", "failed to load auth code", http.StatusInternalServerError)
+		writeJSONError(w, "server_error", "failed to process auth code", http.StatusInternalServerError)
 		return
 	}
-	if authCode == nil || authCode.Used || time.Now().After(authCode.ExpiresAt) {
+	if authCode == nil {
 		writeJSONError(w, "invalid_grant", "invalid or expired code", http.StatusBadRequest)
 		return
 	}
@@ -206,12 +207,6 @@ func (s *Server) handleAuthCodeExchange(w http.ResponseWriter, r *http.Request) 
 	// Verify PKCE.
 	if !VerifyPKCE(codeVerifier, authCode.CodeChallenge, authCode.CodeMethod) {
 		writeJSONError(w, "invalid_grant", "PKCE verification failed", http.StatusBadRequest)
-		return
-	}
-
-	// Mark the code as used.
-	if err := s.Store.MarkAuthCodeUsed(r.Context(), code); err != nil {
-		writeJSONError(w, "server_error", "failed to mark code used", http.StatusInternalServerError)
 		return
 	}
 
@@ -240,14 +235,14 @@ func (s *Server) handleRefreshTokenExchange(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate refresh token.
+	// Atomically claim (revoke) the refresh token.
 	tokenHash := HashToken(refreshToken)
-	storedToken, err := s.Store.GetMCPRefreshToken(r.Context(), tokenHash)
+	storedToken, err := s.Store.ClaimMCPRefreshToken(r.Context(), tokenHash)
 	if err != nil {
-		writeJSONError(w, "server_error", "failed to load refresh token", http.StatusInternalServerError)
+		writeJSONError(w, "server_error", "failed to process refresh token", http.StatusInternalServerError)
 		return
 	}
-	if storedToken == nil || storedToken.Revoked || time.Now().After(storedToken.ExpiresAt) {
+	if storedToken == nil {
 		writeJSONError(w, "invalid_grant", "invalid or expired refresh token", http.StatusBadRequest)
 		return
 	}
@@ -255,9 +250,6 @@ func (s *Server) handleRefreshTokenExchange(w http.ResponseWriter, r *http.Reque
 		writeJSONError(w, "invalid_grant", "token was issued to a different client", http.StatusBadRequest)
 		return
 	}
-
-	// Revoke the old refresh token (rotation).
-	_ = s.Store.RevokeMCPRefreshToken(r.Context(), tokenHash)
 
 	// Issue new tokens.
 	s.issueTokens(w, r, storedToken.UserID, clientID)
